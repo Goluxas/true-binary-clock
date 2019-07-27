@@ -1,0 +1,215 @@
+<html>
+<head>
+    <title>True Binary Clock</title>
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+</head>
+<body>
+    <div>
+        <canvas id="canvas" width="935" height="185" />
+    </div>
+    <div>
+        <input id="set_time" type="text" length="6" placeholder="1:23:45.6" /><br>
+
+        <input id="start_timer" type="button" value="Start Timer">
+        <input id="stop_timer" type="button" value="Stop Timer"><br>
+
+        <input id="reset_timer" type="button" value="Reset Timer">
+    </div>
+</body>
+<script type="text/javascript">
+    const width = 6;
+    const height = 4;
+    /* pwidth/pheight = pixel width/height
+     * buff = pixels of buffer on each side of a tile
+     */
+    const pwidth = 150;
+    const pheight = 40;
+    const buff = 5;
+    //const on_color = '#FF0000';
+    //const off_color = '#0000FF';
+    //const bg_color = '#000000';
+    const on_color = '#0A0862';
+    const off_color = '#03001D';
+    const bg_color = '#040023';
+    const text_color = '#39BEE5';
+    const font = '100px Courier New';
+
+    function int_to_binary_string(value) {
+        let binary = value.toString(2); // holy shit JS, why does this exist?
+        return binary.padStart(24, '0');
+    }
+
+    function parseTime(str_time) {
+        let validator = /(\d:)?(\d{2}:)?(\d{2})(\.\d)?/;
+
+        //parts = str_time.match(validator);
+        match = validator.exec(str_time);
+
+        //if (parts.length == 0) {
+        if ( match === null ) {
+            $("#error").text("Enter values in the format H:MM:SS.S . You may omit hours or deciseconds.");
+            return;
+        }
+
+        /* if there was a match, our units are broken into capture groups
+         * Sample: 1:23:45.6
+         * match[1] == "1:" (hours)
+         * match[2] == "23:" (minutes)
+         * match[3] == "45" (second)
+         * match[4] == ".6" (deciseconds)
+         * if any groups are missing, their index will be undefined
+        */
+
+        let deciseconds = 0;
+        if (match[4] !== undefined) {
+            deciseconds += parseInt(match[4].replace(".", ""));
+        }
+        if (match[3] !== undefined) {
+            // seconds
+            let raw = parseInt(match[3]);
+            if (raw > 59) {
+                throw new Error("Seconds must be < 60");
+            }
+            raw *= 10;
+            deciseconds += raw;
+        }
+        if (match[2] !== undefined) {
+            // minutes
+            let raw = parseInt(match[2].replace(":", ""))
+            if (raw > 59) {
+                throw new Error("Minutes must be < 60");
+            }
+            raw *= 60 * 10;
+            deciseconds += raw;
+        }
+        if (match[1] !== undefined) {
+            // hours
+            // hours and deciseconds are only one digit so they can't be out of range
+            deciseconds += parseInt(match[1].replace(":", "")) * 60 * 60 * 10;
+        }
+        return deciseconds;
+
+    }
+
+    function timeToStr(time) {
+        // time arrives in deciseconds
+
+        // we lob chunks of larger units off it until we have our display time
+        let hours = Math.floor(time/(60 * 60 * 10)); // Math.floor simulates integer division
+        time -= hours * 60 * 60 * 10;
+
+        let minutes = Math.floor(time/(60 * 10));
+        time -= minutes * 60 * 10;
+
+        let seconds = Math.floor(time/10);
+        time -= seconds * 10;
+
+        let deciseconds = time;
+
+        // then combine into a string
+        return hours + ":" + minutes.toString().padStart(2, "0") + ":" + seconds.toString().padStart(2, "0") + "." + deciseconds
+    }
+
+    function draw_clock(canvas, ctx, deciseconds) {
+        // clear away the old cruft
+        ctx.clearRect(0, 0, canvas.width(), canvas.height());
+
+        // fill with background color
+        ctx.fillStyle = bg_color;
+        ctx.fillRect(0, 0, canvas.width(), canvas.height());
+
+        // draw each tile
+        let bin_time = int_to_binary_string(deciseconds);
+        let bit_position = 0;
+        for (let col = 0; col < width; col++) {
+            for (let row = 0; row < height; row++) {
+                // a tile at position (col, row)
+                // (0, 0) = most significant bit
+                //          value of binary time string at position [0]
+                // (5, 3) = least sig bit
+                //          value of binary time string at position [length-1]
+                // ctx.FillRect(left, top, right, bottom)
+                let left = buff + col * (pwidth + buff)
+                let top = buff + row * (pheight + buff)
+                if (bin_time[bit_position] == "0") {
+                    ctx.fillStyle = off_color;
+                }
+                else {
+                    ctx.fillStyle = on_color;
+                }
+                ctx.fillRect(left, top, pwidth, pheight);
+                bit_position += 1;
+            }
+        }
+
+        // draw text representation over it
+        ctx.font = font;
+        ctx.fillStyle = text_color;
+        // fillText(text, left, bottom)
+        // dunno why it's the bottom, but meh
+        ctx.fillText(timeToStr(deciseconds), Math.floor(pwidth * 1.25 + buff * 4), (pheight + buff)*(height - 1));
+
+        // toggleable in interface?
+    }
+
+    $(document).ready(() => {
+
+        const canvas = $("#canvas");
+        //canvas.width(width * (pwidth + buff) + buff);
+        //canvas.height(height * (pheight + buff) + buff);
+
+        const ctx = canvas[0].getContext("2d");
+
+        let stopSignal = false;
+        let time = parseTime("1:23:45.6");
+
+        $("#set_time").change((el) => {
+            try {
+                let deciseconds = parseTime($(el.target).val());
+                time = deciseconds;
+                draw_clock(canvas, ctx, deciseconds);
+            }
+            catch(err) {
+                console.error('Error during #set_time Change event');
+                console.error(err);
+            }
+        });
+
+        draw_clock(canvas, ctx, time);
+
+        $("#start_timer").click(() => {
+            stopSignal = false;
+            let ds_time = time;
+            let ms_time = time * 100;
+            let last = Date.now() // ms since epoch
+
+            function draw() {
+            //while(true) {
+                if (stopSignal) {
+                    return;
+                }
+                ms_time += Date.now() - last;
+                ds_time = Math.floor(ms_time / 100);
+                draw_clock(canvas, ctx, ds_time);
+
+                time = ds_time; // update this tracking variable to be inline with the display
+                last = Date.now();
+
+                requestAnimationFrame(draw);
+            }
+
+            requestAnimationFrame(draw);
+        });
+
+        $("#stop_timer").click(() => {
+            stopSignal = true;
+        });
+
+        $("#reset_timer").click(() => {
+            time = 0;
+            stopSignal = true;
+            draw_clock(canvas, ctx, time);
+        });
+    });
+</script>
+</html>
