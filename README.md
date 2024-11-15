@@ -14,4 +14,4 @@ I found this immensely unsatisfying as that meant no column would ever be fully 
 In this timer, the background pips are a true binary representation of the total deciseconds since the timer began. The least significant bit is the bottom pip in the rightmost column. The next least is above that,
 and the next above that, until the column fills. The next bit is the bottom pip of the column to the left. Repeat this process to fill all 24 columns.
 
-The maximum displayable time for this timer is 2^24 deciseconds, which is about 19 days, or a little over 466 hours.
+The maximum displayable time for this timer is 2^25 - 1 deciseconds, which is about 39 days, or a little over 932 hours.
