@@ -1,5 +1,7 @@
 # True Binary Clock
 
+[View Live Demo](https://goluxas.github.io/true-binary-clock)
+
 ## What is this?
 
 This project displays a stopwatch type timer that mimics the one used by Awesome Games Done Quick (AGDQ) in their event streams.
